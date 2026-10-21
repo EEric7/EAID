@@ -1,9 +1,12 @@
-name: CI
+name: CI - EAID
 
 on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
+  schedule:
+    - cron: '23 5 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -52,3 +55,26 @@ jobs:
               exit 1
             fi
           done
+
+  vulnerability-audit:
+    name: CodeQL vulnerability audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      - name: Analyze JavaScript
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:javascript-typescript
