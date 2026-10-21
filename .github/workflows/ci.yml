@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate static site
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Check JavaScript syntax
+        run: find js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+
+      - name: Check required site files
+        shell: bash
+        run: |
+          required_files=(
+            index.html
+            css/styles.css
+            js/ambient.js
+            js/contact-animation.js
+            js/cookies.js
+            js/globe3d.js
+            js/nav-context.js
+            js/tech-carousel.js
+          )
+
+          for file in "${required_files[@]}"; do
+            if [[ ! -f "$file" ]]; then
+              echo "::error file=$file::Required site file is missing"
+              exit 1
+            fi
+          done
