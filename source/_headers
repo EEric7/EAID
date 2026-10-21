@@ -1,0 +1,15 @@
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-7v//oCxXAqFstrYiMQqrjtK9IVdiwRhit5ZQLpcgC3I=' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com; img-src 'self' data: https://cdn.jsdelivr.net; media-src 'self'; connect-src 'self'; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  Permissions-Policy: camera=(), geolocation=(), microphone=()
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+
+/assets/*
+  Cache-Control: public, max-age=604800
+
+/css/*
+  Cache-Control: public, max-age=604800
+
+/js/*
+  Cache-Control: public, max-age=604800
