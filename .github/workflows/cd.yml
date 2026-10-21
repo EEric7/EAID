@@ -1,0 +1,109 @@
+name: CD - EAID
+
+on:
+  workflow_run:
+    workflows: [CI - EAID]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  publish-image:
+    name: Publish production image
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Resolve source revision
+        id: revision
+        shell: bash
+        env:
+          WORKFLOW_SHA: ${{ github.event.workflow_run.head_sha }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            echo "sha=${WORKFLOW_SHA}" >> "$GITHUB_OUTPUT"
+            echo "short=${WORKFLOW_SHA:0:12}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${CURRENT_SHA}" >> "$GITHUB_OUTPUT"
+            echo "short=${CURRENT_SHA:0:12}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out validated revision
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.revision.outputs.sha }}
+
+      - name: Resolve image name
+        id: image
+        shell: bash
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        id: metadata
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=sha-${{ steps.revision.outputs.short }}
+          labels: |
+            org.opencontainers.image.title=EAI Digital
+            org.opencontainers.image.description=Site vitrine EAI Digital
+
+      - name: Build and publish image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ./source
+          file: ./source/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          annotations: ${{ steps.metadata.outputs.annotations }}
+          cache-from: type=gha,scope=production
+          cache-to: type=gha,mode=max,scope=production
+          provenance: mode=max
+          sbom: true
+
+      - name: Publish deployment summary
+        shell: bash
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          {
+            echo "## Image publiée"
+            echo
+            echo "- Image : \`${IMAGE}:latest\`"
+            echo "- Digest : \`${DIGEST}\`"
+            echo "- Plateformes : \`linux/amd64\`, \`linux/arm64\`"
+          } >> "$GITHUB_STEP_SUMMARY"
