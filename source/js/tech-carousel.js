@@ -41,7 +41,7 @@
   motionToggle?.addEventListener('click', () => {
     const isPaused = track.classList.toggle('is-paused');
     motionToggle.setAttribute('aria-pressed', String(isPaused));
-    motionToggle.setAttribute('aria-label', isPaused ? 'Relancer le carrousel' : 'Mettre le carrousel en pause');
+    motionToggle.setAttribute('aria-label', isPaused ? 'Relancer le carrousel' : 'Mettre en pause le carrousel');
     const label = motionToggle.querySelector('span');
     if (label) label.textContent = isPaused ? 'Relancer le carrousel' : 'Mettre en pause';
   });
