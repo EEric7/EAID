@@ -54,6 +54,7 @@ jobs:
           ref: ${{ steps.revision.outputs.sha }}
 
       - name: Validate Cloudflare configuration
+        id: cloudflare-config
         shell: bash
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -66,19 +67,33 @@ jobs:
             CLOUDFLARE_PROJECT_NAME
           )
 
+          missing_values=()
           for name in "${required_values[@]}"; do
             if [[ -z "${!name}" ]]; then
-              echo "::error::The ${name} configuration value is missing."
-              exit 1
+              missing_values+=("$name")
             fi
           done
+
+          if (( ${#missing_values[@]} > 0 )); then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Cloudflare Pages deployment skipped; missing required configuration: ${missing_values[*]}."
+            {
+              echo "## Cloudflare Pages deployment skipped"
+              echo
+              echo "Missing required configuration: ${missing_values[*]}."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
           if [[ ! "$CLOUDFLARE_PROJECT_NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
             echo "::error::CLOUDFLARE_PROJECT_NAME must contain only lowercase letters, numbers, and hyphens."
             exit 1
           fi
 
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
       - name: Prepare deployment artifact
+        if: steps.cloudflare-config.outputs.configured == 'true'
         shell: bash
         run: |
           install -m 700 -d "$RUNNER_TEMP/site"
@@ -86,6 +101,7 @@ jobs:
           cp -R source/assets source/css source/js "$RUNNER_TEMP/site/"
 
       - name: Deploy to Cloudflare Pages
+        if: steps.cloudflare-config.outputs.configured == 'true'
         id: cloudflare
         uses: cloudflare/wrangler-action@v4
         with:
@@ -99,6 +115,7 @@ jobs:
             --commit-hash=${{ steps.revision.outputs.sha }}
 
       - name: Publish deployment summary
+        if: steps.cloudflare-config.outputs.configured == 'true'
         shell: bash
         env:
           REVISION: ${{ steps.revision.outputs.sha }}
