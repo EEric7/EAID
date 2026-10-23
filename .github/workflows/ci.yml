@@ -63,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox, webkit]
+        browser: ${{ fromJSON(github.event_name == 'push' && '["chromium"]' || '["chromium","firefox","webkit"]') }}
 
     steps:
       - name: Check out repository
